@@ -89,13 +89,11 @@ let var_to_json v =
   "Name", `String (Vars.name v);
   "Type", type_to_json (Vars.ty v)]
 
-let operator_to_json (ftype,str,abs_def) = 
+let operator_to_json (ftype,str,abs_dt) = 
     `Assoc ["Name", `String str; 
     "Type_Args", `List (List.map type_to_json (ftype.fty_args));
     "Type_Out", type_to_json (ftype.fty_out);
-    "Crypto_fun", `String (match abs_def with 
-    |None -> "None"
-    |Some d -> Format.asprintf "%a" Symbols.OpData.pp_abstract_def d)]
+    "Crypto_fun", abs_dt]
 
 let macro_to_json (str,indices,ty) = 
   `Assoc ["Name", `String str; 
@@ -105,10 +103,15 @@ let macro_to_json (str,indices,ty) =
 
 let abs_symb f table = 
   if Symbols.OpData.is_abstract f table then 
-    let def,_ = Symbols.OpData.get_abstract_data f table in 
-    Some def
+    let def,assoc_fun = Symbols.OpData.get_abstract_data f table in 
+    let ls = List.map 
+      (fun f -> let f_def,_ = Symbols.OpData.get_abstract_data f table in 
+        `Assoc ["Name", `String (Symbols.to_string f);
+        "Def", `String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def f_def)]) 
+    assoc_fun in 
+    `Assoc ["Def",`String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def def); "AssocFun", `List ls]
   else
-    None
+    `String "None"
 
 let cryptovampire_export (s:TraceSequent.t) = 
   let env = TraceSequent.env s in 
@@ -123,7 +126,7 @@ let cryptovampire_export (s:TraceSequent.t) =
   and name_table = 
     Symbols.Name.fold 
       (fun name _ acc -> 
-        ((Symbols.get_name_data name table).n_fty, Symbols.to_string name,None)::acc  
+        ((Symbols.get_name_data name table).n_fty, Symbols.to_string name,`String "None")::acc  
       )  
       [] 
       table
