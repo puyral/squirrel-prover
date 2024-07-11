@@ -29,7 +29,7 @@ depopts: [
   "alt-ergo"
   "js_of_ocaml"
   "js_of_ocaml-tyxml"
-  "ppx_deriving_yojson"
+  "ppx_yojson_conv "
   "dream"
 ]
 

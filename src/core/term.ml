@@ -188,6 +188,7 @@ type term =
   | Diff of term diff_args
   | Find of Vars.var list * term * term * term 
   | Quant of quant * Vars.var list * term 
+  [@@deriving yojson_of]
 
 type t = term
 

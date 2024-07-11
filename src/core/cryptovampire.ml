@@ -1,6 +1,10 @@
 open Yojson 
 open Term 
 open Type
+module SE = SystemExpr
+module S = Symbols
+
+(* Let's go with PascalCase everywhere if possible *)
 
 let quant_to_json q =  match q with 
   |ForAll -> `String "ForAll"
@@ -90,15 +94,19 @@ let var_to_json v =
   "Type", type_to_json (Vars.ty v)]
 
 let operator_to_json (ftype,str,abs_dt) = 
-    `Assoc ["Name", `String str; 
-    "Type_Args", `List (List.map type_to_json (ftype.fty_args));
-    "Type_Out", type_to_json (ftype.fty_out);
-    "Crypto_fun", abs_dt]
+  let base = 
+    ["Name", `String str; 
+    "TypeArgs", `List (List.map type_to_json (ftype.fty_args));
+    "TypeOut", type_to_json (ftype.fty_out)]
+  in match abs_dt with
+    | Some (`Assoc abs_dt) ->
+          `Assoc (base @ abs_dt)
+    | None -> `Assoc base
 
 let macro_to_json (str,indices,ty) = 
   `Assoc ["Name", `String str; 
-  "Index_arity", `Int indices;
-  "Type_Out", type_to_json ty]
+  "IndexArity", `Int indices;
+  "TypeOut", type_to_json ty]
 
 
 let abs_symb f table = 
@@ -109,14 +117,20 @@ let abs_symb f table =
         `Assoc ["Name", `String (Symbols.to_string f);
         "Def", `String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def f_def)]) 
     assoc_fun in 
-    `Assoc ["Def",`String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def def); "AssocFun", `List ls]
+    Some (`Assoc ["Def",`String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def def); "AssocFun", `List ls])
   else
-    `String "None"
+    None
 
 let cryptovampire_export (s:TraceSequent.t) = 
   let env = TraceSequent.env s in 
+  let system = match SystemExpr.to_fset env.system.set with 
+    | exception SystemExpr.(Error (_,Expected_fset)) -> Tactics.(hard_failure (Failure "I was told to error out in this case"))
+    | fsys -> fsys 
+  in 
   let evars = Vars.to_vars_list env.vars 
   and table = env.table in 
+  let actions  = SystemExpr.map_descrs (fun x -> x)  table system in
+  (* let all_actions = SE.actions table system in *)
   let fun_table =
     Symbols.Operator.fold
     (fun fname _ acc -> 
@@ -126,7 +140,7 @@ let cryptovampire_export (s:TraceSequent.t) =
   and name_table = 
     Symbols.Name.fold 
       (fun name _ acc -> 
-        ((Symbols.get_name_data name table).n_fty, Symbols.to_string name,`String "None")::acc  
+        ((Symbols.get_name_data name table).n_fty, Symbols.to_string name,None)::acc  
       )  
       [] 
       table
@@ -159,11 +173,128 @@ let cryptovampire_export (s:TraceSequent.t) =
   "Functions", `List (List.map operator_to_json fun_table);
   "Names", `List (List.map operator_to_json name_table);
   "Macros", `List (List.map macro_to_json macro_table)] in 
-  Format.printf "%s@." (Basic.pretty_to_string j_export) ;
+  (* Format.printf "%s@." (Basic.pretty_to_string j_export) ; *)
+
+  let oc = open_out_gen [Open_append;Open_creat] 0o644 "/tmp/sq.json" in 
+  let ppf = Format.formatter_of_out_channel oc in 
+  Format.fprintf ppf "%s@." (Basic.pretty_to_string j_export) 
 
 
+module type MSymbol = sig
+include S.SymbolKind
+  type mdata
+  val mdata_of_data : S.data -> mdata option
+end
+
+module GetSymbolList (N : MSymbol) = struct
+  let get_data_symbol_list (table: S.table) : (N.ns S.t * N.mdata) list =
+    N.fold (fun symb data acc -> (symb, Option.get (N.mdata_of_data data))::acc) [] table
+
+  let get_symbol_list (table: S.table) : N.ns S.t list =
+    List.map fst (get_data_symbol_list table)
+end
+
+module MName : MSymbol = struct
+  include S.Name
+  type mdata = S.name_data
+  let mdata_of_data = function
+    | S.Name data -> Some data
+    | _ -> None
+end
+
+module MOperator : MSymbol = struct
+  include S.Operator
+  type mdata = S.OpData.op_data
+  let mdata_of_data = function
+    | S.OpData.Operator data -> Some data
+    | _ -> None
+end
+
+module MType : MSymbol = struct
+  include S.BType
+  type mdata = S.TyInfo.t list
+  let mdata_of_data = function
+  | S.TyInfo.Type l -> Some l
+  | _ -> None
+end
+
+module MMacro : MSymbol = struct
+  include S.Macro
+  type mdata =  S.macro_data
+  let mdata_of_data = function
+  | S.Macro d -> Some d
+  | _ -> None
+end
+
+module MAction: MSymbol = struct 
+  include S.Action
+  type mdata = Action.data
+  let mdata_of_data = function
+  | Action.ActionData a -> Some a
+  | _ -> None
+end
 
 
+(** Context surounding cv, this gather all the sq info that needs to be sent *)
+type cv_context = {
+  hypotheses : term list; (** list of hypothesis *)
+  query: term; (** the query to be proven*)
+  variables: Vars.var list; (** list of free variables in `hypotheses` and `query`*)
+  operators: S.Operator.ns; (**  operators *)
+  names: S.Name.ns; (** names *)
+  macros: S.Macro.ns; (** macros *)
+  types: S.BType.ns; (** the type declarations *)
+  table: S.table; (** the symbol table *)
+  actions: Action.descr (** the actions *)
+  (* types: Sy *)
+}
 
 
+(** paramerters to be passed on to cv *)
+type cv_parameters = {
+  num_retry : int; (** number of retries*)
+  timeout: int (** timeout for each solvers*)
+}
 
+let default_parameters = {
+  num_retry = 5;
+  timeout = 1;
+}
+
+module L = Location
+module TA = TacticsArgs
+(** parse the arguments for the `cryptovampire` tactic *)
+let parse_args =
+  let aux acc = function 
+  (* ~nt=[x] for num of retry *)
+  | TA.NList ({L.pl_desc="nt"}, [{L.pl_desc=nt}]) -> (
+    match int_of_string_opt nt with
+    | Some(nt) -> {acc with num_retry=nt}
+    | None -> Tactics.(hard_failure (Failure (Printf.sprintf "%s in not a number" nt))))
+  (* ~t=[x] for timeout *)
+  | TA.NList ({L.pl_desc="t"}, [{L.pl_desc=nt}]) -> (
+    match int_of_string_opt nt with
+    | Some(nt) -> {acc with timeout=nt}
+    | None -> Tactics.(hard_failure (Failure (Printf.sprintf "%s in not a number" nt))))
+  
+  | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
+  in List.fold_left aux default_parameters
+
+(* register the tactic *)
+(* let () =
+  ProverTactics.register_general "cryptovampire" 
+    ~pq_sound:false
+    (* ^^^^^^^^^^^^ don't know if cv is post-quantum safe, so I'll assume it's not *)
+    (fun args s sk fk -> 
+      
+      let args = match args with
+         | [Named_args args] -> args
+         | _ -> assert false
+      in let s = match s with
+         | Goal.Global _ -> Tactics.(hard_failure (Failure "CryptoVampire doesn't support global goals"))
+         | Goal.Local s -> s
+      in let parameters = parse_args args
+    in match is_sequent_valid s with
+    | Ok () -> sk [] fk
+    | Error e -> fk (None, Tactics.Failure e)
+      ) *)
