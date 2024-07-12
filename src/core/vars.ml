@@ -5,6 +5,7 @@ type var = {
   id : Ident.t;
   ty : Type.ty;
 }
+[@@deriving yojson_of]
 
 type vars = var list
 

@@ -166,6 +166,7 @@ type 'a diff_args =
 
 (*------------------------------------------------------------------*)
 type quant = ForAll | Exists | Seq | Lambda
+[@@deriving yojson_of]
 
 let pp_quant fmt = function
   | ForAll -> Fmt.pf fmt "forall"
@@ -188,7 +189,6 @@ type term =
   | Diff of term diff_args
   | Find of Vars.var list * term * term * term 
   | Quant of quant * Vars.var list * term 
-  [@@deriving yojson_of]
 
 type t = term
 

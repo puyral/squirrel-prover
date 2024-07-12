@@ -5,10 +5,12 @@ type ident = private {
   name : string;
   tag  : int;
 }
+[@@deriving yojson_of]
 
 type idents = ident list
 
 type t = ident
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 val create : string -> ident

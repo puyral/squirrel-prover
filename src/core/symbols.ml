@@ -1,4 +1,5 @@
 open Utils
+open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 module L = Location
 
@@ -44,7 +45,12 @@ let p_path_to_string ?sep ((top,sub) : p_path) =
 
 (*------------------------------------------------------------------*)
 type assoc = [`Right | `Left | `NonAssoc]
+[@@deriving yojson_of]
+let yojson_of_assoc x = Json.to_assoc (yojson_of_assoc x)
+
 type symb_type = [ `Prefix | `Infix of assoc ]
+[@@deriving yojson_of]
+let yojson_of_symb_type x = Json.to_assoc (yojson_of_symb_type x)
 
 (*------------------------------------------------------------------*)
 type symbol_kind =
@@ -1008,6 +1014,8 @@ module OpData = struct
     | DH_DDH
     | DH_CDH
     | DH_GDH
+[@@deriving yojson_of]
+let yojson_of_dh_hyp x = Json.to_assoc (yojson_of_dh_hyp x)
 
   (** Definition on an abstract operator *)
   type abstract_def =
@@ -1021,8 +1029,13 @@ module OpData = struct
     | CheckSign
     | PublicKey
     | Abstract of symb_type
+[@@deriving yojson_of]
+let yojson_of_abstract_def = function
+| Abstract a -> `Assoc ["Abstract", yojson_of_symb_type a]
+| x -> Json.to_assoc (yojson_of_abstract_def x)
 
   type associated_fun = fname list
+  
 
   (*------------------------------------------------------------------*)
   (** See `.mli` *)
@@ -1144,11 +1157,13 @@ module TyInfo = struct
       Restrict the instantiation domain of a type. *)
   type t =
     | Large
-    | Name_fixed_length
+    | Name_fixed_length [@name "NameFixedLength"]
     | Finite
     | Fixed
-    | Well_founded
+    | Well_founded [@name "WellFounded"]
     | Enum
+  [@@deriving yojson_of]
+  let yojson_of_t x = Json.to_assoc (yojson_of_t x)
 
   type data += Type of t list
 

@@ -374,6 +374,7 @@ module OpData : sig
     | CheckSign
     | PublicKey
     | Abstract of symb_type
+[@@deriving yojson_of]
 
   type associated_fun = fname list
 
@@ -477,6 +478,7 @@ module TyInfo : sig
     | Fixed               (** independent from η *)
     | Well_founded        (** well-founded for all η *)
     | Enum                (** enumerable in poly time  *)
+  [@@deriving yojson_of]
 
   type data += Type of t list
         

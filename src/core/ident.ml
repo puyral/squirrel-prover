@@ -1,14 +1,17 @@
 open Utils
+open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 (*------------------------------------------------------------------*)
 type ident = {
   name : string;
   tag  : int;
 }
+[@@deriving yojson_of]
 
 type idents = ident list
 
 type t = ident
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 let cpt = ref 0

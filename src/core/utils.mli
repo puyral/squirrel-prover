@@ -281,3 +281,8 @@ module Lazy : sig
       
   val map : ('a -> 'b) -> 'a t -> 'b t
 end
+
+module Json : sig
+  val to_assoc: Yojson.Safe.t -> Yojson.Safe.t
+  val to_list: Yojson.Safe.t -> Yojson.Safe.t
+end

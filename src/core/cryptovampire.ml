@@ -1,24 +1,28 @@
 open Yojson 
+open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 open Term 
 open Type
 module SE = SystemExpr
 module S = Symbols
 
-(* Let's go with PascalCase everywhere if possible *)
+let (<$>) = List.map
 
-let quant_to_json q =  match q with 
-  |ForAll -> `String "ForAll"
-  |Exists -> `String "Exists"
-  |Seq -> `String "Seq"
-  |Lambda -> `String "Lambda"
+
+  let (<@>) (`Assoc l) (`Assoc l') =  `Assoc (l @ l')
+
+let (<<@>) (e: string * Yojson.Safe.t) (`Assoc l) = `Assoc (e::l)
+let (<@>>) (`Assoc l) (e: string * Yojson.Safe.t) = `Assoc (e::l)
+let (<<@>>) (e: string * Yojson.Safe.t) (e': string * Yojson.Safe.t) = `Assoc ([e; e'])
+
+(* Let's go with PascalCase everywhere if possible *)
 
 let rec term_to_json t = match t with 
   |App (f,tl) -> 
-    `Assoc ["Constructor", `String "App";
-      "Fsymb", term_to_json f;
-      "Arguments", `List (List.map term_to_json tl)]
+    `Assoc ["constructor", `String "App";
+      "f", term_to_json f;
+      "args", `List (List.map term_to_json tl)]
   |Fun (f,_) -> 
-    `Assoc ["Constructor", `String "Fun";
+    `Assoc ["constructor", `String "Fun";
       "Fname", `String (Symbols.to_string f)]
   |Name (n,tl) -> 
     `Assoc ["Constructor", `String "Name";
@@ -62,38 +66,11 @@ let rec term_to_json t = match t with
         "Term3", term_to_json t3]
   |Quant (q,vl,t1) -> ignore q;
     `Assoc ["Constructor", `String "Quant";
-      "Quantficator", quant_to_json q;
+      "Quantficator", Term.yojson_of_quant q;
       "Vars", `List (List.map (fun v -> (term_to_json (mk_var v))) vl);
       "Term", term_to_json t1]
 
-let rec type_to_json ty = match ty with 
-    |Message -> `Assoc ["Constructor", `String "Message"]
-    |Boolean -> `Assoc ["Constructor", `String "Boolean"]
-    |Index -> `Assoc ["Constructor", `String "Index"]
-    |Timestamp -> `Assoc ["Constructor", `String "Timestamp"]
-    |TBase s -> `Assoc ["Constructor", `String "TBase"; "String", `String s]
-    |TVar tv -> 
-      `Assoc ["Constructor", `String "TVar";
-        "Id", `Int (Ident.tag (ident_of_tvar tv));
-        "Name", `String (Ident.name (ident_of_tvar tv))]
-    |TUnivar tu -> ignore tu;
-      `Assoc ["Constructor", `String "TUnivar";
-        "Id", `String "TODO";
-        "Name", `String "TODO"]
-    |Tuple tl ->
-      `Assoc ["Constructor", `String "Tuple";
-        "Elements",`List (List.map type_to_json tl)]
-    |Fun (t1,t2) ->
-      `Assoc ["Constructor", `String "Fun";
-        "Type1", type_to_json t1;
-        "Type2", type_to_json t2]
-
-let var_to_json v = 
-  `Assoc ["Id", `Int (Vars.hash v);
-  "Name", `String (Vars.name v);
-  "Type", type_to_json (Vars.ty v)]
-
-let operator_to_json (ftype,str,abs_dt) = 
+(* let operator_to_json (ftype,str,abs_dt) = 
   let base = 
     ["Name", `String str; 
     "TypeArgs", `List (List.map type_to_json (ftype.fty_args));
@@ -101,12 +78,12 @@ let operator_to_json (ftype,str,abs_dt) =
   in match abs_dt with
     | Some (`Assoc abs_dt) ->
           `Assoc (base @ abs_dt)
-    | None -> `Assoc base
+    | None -> `Assoc base *)
 
-let macro_to_json (str,indices,ty) = 
+(* let macro_to_json (str,indices,ty) = 
   `Assoc ["Name", `String str; 
   "IndexArity", `Int indices;
-  "TypeOut", type_to_json ty]
+  "TypeOut", type_to_json ty] *)
 
 
 let abs_symb f table = 
@@ -177,13 +154,16 @@ let cryptovampire_export (s:TraceSequent.t) =
 
   let oc = open_out_gen [Open_append;Open_creat] 0o644 "/tmp/sq.json" in 
   let ppf = Format.formatter_of_out_channel oc in 
-  Format.fprintf ppf "%s@." (Basic.pretty_to_string j_export) 
+  Format.fprintf ppf "%s@." (Safe.to_string j_export) 
 
 
 module type MSymbol = sig
 include S.SymbolKind
   type mdata
+[@@deriving yojson_of]
   val mdata_of_data : S.data -> mdata option
+
+  val name: string
 end
 
 module GetSymbolList (N : MSymbol) = struct
@@ -192,14 +172,31 @@ module GetSymbolList (N : MSymbol) = struct
 
   let get_symbol_list (table: S.table) : N.ns S.t list =
     List.map fst (get_data_symbol_list table)
+  
+    let json_of_symb x = `String (S.to_string x)
+  
+  let json_of  (symb: N.ns S.t)  (data: N.mdata) =
+  ("symb", json_of_symb symb) <<@>> ("data", N.yojson_of_mdata data)
+  
+  let yojson_of_table (table: S.table)  =
+    `Assoc [N.name, `List (List.map (fun (n, d) -> json_of n d) (get_data_symbol_list table))]
 end
 
-module MName : MSymbol = struct
-  include S.Name
-  type mdata = S.name_data
+
+(* let json_of_ftype ({fty_vars; fty_args; fty_out}:Type.ftype)  =
+  ("Vars", `List (json_of_tvar <$> fty_vars)) 
+    <<@>> ("Args", `List (json_of_ty <$> fty_args)) 
+    <@>> ("Out", json_of_ty fty_out) *)
+
+module MType : MSymbol = struct
+  include S.BType
+  type mdata = S.TyInfo.t list
+[@@deriving yojson_of]
   let mdata_of_data = function
-    | S.Name data -> Some data
-    | _ -> None
+  | S.TyInfo.Type l -> Some l
+  | _ -> None
+
+  let name = "Type"
 end
 
 module MOperator : MSymbol = struct
@@ -208,14 +205,32 @@ module MOperator : MSymbol = struct
   let mdata_of_data = function
     | S.OpData.Operator data -> Some data
     | _ -> None
+  
+    let name = "Operator"
+  let yojson_of_mdata ({ftype; def}: mdata) =
+
+    let json_of_concrete ({name; ty_vars; args; out_ty; body}: Operator.concrete_operator) =
+      `Assoc []
+    in
+    let json_of_def = function
+      | S.OpData.Abstract (adef, afun) -> ("abstract_def", S.OpData.yojson_of_abstract_def adef) <<@>> 
+      ("associated_fun", `List  ((fun s -> `String (S.to_string s)) <$>  afun))
+      | S.OpData.Concrete (Operator.Val c) -> json_of_concrete c
+      | _ -> assert false
+  in ("type", Type.yojson_of_ftype ftype) <<@>> ("def", json_of_def def)
+
 end
 
-module MType : MSymbol = struct
-  include S.BType
-  type mdata = S.TyInfo.t list
+
+module MName : MSymbol = struct
+  include S.Name
+  type mdata = S.name_data
   let mdata_of_data = function
-  | S.TyInfo.Type l -> Some l
-  | _ -> None
+    | S.Name data -> Some data
+    | _ -> None
+    let name = "Name"
+
+  let yojson_of_mdata ({n_fty}:mdata) = Type.yojson_of_ftype n_fty
 end
 
 module MMacro : MSymbol = struct
@@ -224,6 +239,11 @@ module MMacro : MSymbol = struct
   let mdata_of_data = function
   | S.Macro d -> Some d
   | _ -> None
+
+    (* TODO *)
+  let yojson_of_mdata d = `Assoc []
+
+  let name = "Macro"
 end
 
 module MAction: MSymbol = struct 
@@ -232,6 +252,9 @@ module MAction: MSymbol = struct
   let mdata_of_data = function
   | Action.ActionData a -> Some a
   | _ -> None
+
+  let yojson_of_mdata d = `Assoc []
+  let name = "Action"
 end
 
 
@@ -240,12 +263,8 @@ type cv_context = {
   hypotheses : term list; (** list of hypothesis *)
   query: term; (** the query to be proven*)
   variables: Vars.var list; (** list of free variables in `hypotheses` and `query`*)
-  operators: S.Operator.ns; (**  operators *)
-  names: S.Name.ns; (** names *)
-  macros: S.Macro.ns; (** macros *)
-  types: S.BType.ns; (** the type declarations *)
-  table: S.table; (** the symbol table *)
-  actions: Action.descr (** the actions *)
+  actions: MAction.mdata list;
+  (* table: S.table; * the symbol table *)
   (* types: Sy *)
 }
 
@@ -255,6 +274,7 @@ type cv_parameters = {
   num_retry : int; (** number of retries*)
   timeout: int (** timeout for each solvers*)
 }
+[@@deriving yojson_of]
 
 let default_parameters = {
   num_retry = 5;

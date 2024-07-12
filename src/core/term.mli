@@ -83,6 +83,7 @@ type 'a diff_args =
 
 (*------------------------------------------------------------------*)
 type quant = ForAll | Exists | Seq | Lambda
+[@@deriving yojson_of]
 
 val pp_quant : quant formatter
 

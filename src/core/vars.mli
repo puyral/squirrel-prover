@@ -35,6 +35,7 @@ type var = private {
   id : Ident.t;
   ty : Type.ty;
 }
+[@@deriving yojson_of]
 
 type vars = var list
 

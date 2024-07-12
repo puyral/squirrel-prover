@@ -8,6 +8,7 @@ module Sid = Ident.Sid
 (** Type variables *)
 
 type tvar
+[@@deriving yojson_of]
 type tvars = tvar list
 
 val pp_tvar     : tvar formatter
@@ -49,6 +50,7 @@ type ty =
 
   | Fun of ty * ty
   (** arrow type [t1 -> t2] *)
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 (** {2 Iterators, do not recurse} *)
@@ -188,6 +190,7 @@ type 'a ftype_g = private {
 
 (** A [ftype] uses [tvar] for quantified type variables. *)
 type ftype = tvar ftype_g
+[@@deriving yojson_of]
 
 (** An opened [ftype], using [univar] for quantified type varibales *)
 type ftype_op = univar ftype_g

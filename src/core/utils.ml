@@ -746,3 +746,15 @@ module Lazy = struct
 
   let map f x = lazy (f (Lazy.force x))
 end
+
+module Json = struct 
+  let to_assoc = function
+  | `List (`String key::[]) -> `String key
+  | `List (`String key::l) -> `Assoc [key,`List l]
+  | x -> x
+
+  let to_list = function
+  | `Assoc [key,`List l] -> `List (`String key::l)
+  | `String _ as x-> `List [x]
+  | x -> x
+end

@@ -1,4 +1,5 @@
 open Utils
+open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 (*------------------------------------------------------------------*)
 module Mid = Ident.Mid
@@ -8,6 +9,7 @@ module Sid = Ident.Sid
 (** Type variables *)
 
 type tvar = Ident.t
+[@@deriving yojson_of]
 type tvars = tvar list
 
 let _pp_tvar ~dbg fmt id = 
@@ -26,6 +28,7 @@ let ident_of_tvar id = id
 (** Variable for type inference *)
 
 type univar  = Ident.t
+[@@deriving yojson_of]
 type univars = univar list
 
 (* always debug printing *)
@@ -86,6 +89,10 @@ type ty =
 
   | Tuple of ty list
   | Fun of ty * ty
+[@@deriving yojson_of]
+let yojson_of_ty = function
+  | Fun (a, b) -> `Assoc ["Fun", `Assoc ["In", yojson_of_ty a; "Out", yojson_of_ty b]]
+  | x -> Json.to_assoc (yojson_of_ty x)
 
 (*------------------------------------------------------------------*)
 (** {2 Iterators, do not recurse} *)
@@ -540,13 +547,15 @@ let tuple = function
     Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
 *)
 type 'a ftype_g = {
-  fty_vars : 'a list; (** 'a₁ ... 'aₙ *)  
-  fty_args : ty list; (** τ₁, ... ,τₙ *)
-  fty_out  : ty;      (** τ *)
+  fty_vars : 'a list [@key "vars"]; (** 'a₁ ... 'aₙ *)  
+  fty_args : ty list [@key "args"]; (** τ₁, ... ,τₙ *)
+  fty_out  : ty      [@key "out"]; (** τ *)
 }
+[@@deriving yojson_of]
 
 (** A [ftype] uses [tvar] for quantified type variables. *)
 type ftype = tvar ftype_g
+[@@deriving yojson_of]
 
 (** An opened [ftype], using [univar] for quantified type varibales *)
 type ftype_op = univar ftype_g
