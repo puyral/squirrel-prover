@@ -16,7 +16,7 @@ let (<<@>>) (e: string * Yojson.Safe.t) (e': string * Yojson.Safe.t) = `Assoc ([
 
 (* Let's go with PascalCase everywhere if possible *)
 
-let rec term_to_json t = match t with 
+let rec term_to_json : Term.term -> Yojson.Safe.t = function
   |App (f,tl) -> 
     `Assoc ["constructor", `String "App";
       "f", term_to_json f;

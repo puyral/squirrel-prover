@@ -53,6 +53,7 @@ type action = Term.term list t
 (** An [action_v] is a [action] statically known to be instantiated on 
     variables. *)
 type action_v = Vars.var list t
+[@@deriving yojson_of]
 
 val to_action_v : action   -> action_v 
 val to_action   : action_v -> action 

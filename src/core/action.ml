@@ -1,4 +1,5 @@
 open Utils
+open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 open Ppenv
 
 module L  = Location
@@ -9,8 +10,10 @@ type 'a item = {
   par_choice : int * 'a ; (** position in parallel compositions *)
   sum_choice : int * 'a   (** position in conditionals *)
 }
+[@@deriving yojson_of]
 
 type 'a t = 'a item list
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 type shape = int t
@@ -19,6 +22,7 @@ type action = Term.term list t
 
 (*------------------------------------------------------------------*)
 type action_v = Vars.var list t
+[@@deriving yojson_of]
 
 let to_action_v (a : action) : action_v = 
   List.map (fun { par_choice = i, p_vs; sum_choice = j, s_vs; } ->
