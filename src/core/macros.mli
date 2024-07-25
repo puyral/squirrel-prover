@@ -50,6 +50,7 @@ val as_general_macro : Symbols.data -> general_macro_data
 
 (** An execution model *)
 type exec_model = Classical | PostQuantum
+[@@deriving yojson_of]
 
 (** The definition of an execution model *)    
 type exec_model_def = {
@@ -182,6 +183,9 @@ type global_data = {
   bodies : (System.Single.t * Term.term) list;
   (** Definitions of macro body for single systems where it is defined. *)
 
+  exec_model : exec_model; 
+  (** The execution model this macro was declared in*)
+  
   ty : Type.ty;
   (** The type of the macro, which does not depends on the system. *)
 }

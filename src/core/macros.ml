@@ -82,6 +82,7 @@ type exec_model_def = {
 
 (** An execution model *)
 type exec_model = Classical | PostQuantum
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 module Classical = struct

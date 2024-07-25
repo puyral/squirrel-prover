@@ -33,20 +33,20 @@ let rec yojson_of_term : Term.term -> json = function
   | Fun (f, _) ->
       `Assoc
         [
-          ("constructor", `String "Fun"); ("symb", `String (Symbols.to_string f));
+          ("constructor", `String "Fun"); ("symb", S.yojson_of_path f);
         ]
   | Name (n, tl) ->
       `Assoc
         [
           ("constructor", `String "Name");
-          ("symb", `String (Symbols.to_string n.s_symb));
+          ("symb", yojson_of_nsymb n);
           ("args", `List (List.map yojson_of_term tl));
         ]
   | Macro (m, tl, ts) ->
       `Assoc
         [
           ("constructor", `String "Macro");
-          ("symb", `String (Symbols.to_string m.s_symb));
+          ("symb", yojson_of_msymb m);
           ("args", `List (List.map yojson_of_term tl));
           ("timestamp", yojson_of_term ts);
         ]
@@ -54,7 +54,7 @@ let rec yojson_of_term : Term.term -> json = function
       `Assoc
         [
           ("constructor", `String "Action");
-          ("symb", `String (Symbols.to_string a));
+          ("symb", S.yojson_of_path a);
           ("args", `List (List.map yojson_of_term tl));
         ]
   | Var v ->
@@ -204,12 +204,13 @@ module type MSymbol = sig
 end
 
 module MExtra (N : MSymbol) = struct
-  let yojson_of_symb x = `String (S.to_string x)
+  let yojson_of_path: N.ns S.path -> json = 
+    S.yojson_of_path
 
-  type content = { symb : N.ns S.t; data : N.mdata }
+  type content = { symb : N.ns S.path; data : N.mdata }
 
   let yojson_of_content ({ symb; data } : content) =
-    `Assoc [ ("symb", yojson_of_symb symb); ("data", N.yojson_of_mdata data) ]
+    `Assoc [ ("symb", yojson_of_path symb); ("data", N.yojson_of_mdata data) ]
 
   let get_content_list (table : S.table) : content list =
     N.fold
@@ -243,10 +244,11 @@ module MOperator : MSymbol = struct
 
   let yojson_of_mdata ({ ftype; def } : mdata) =
     let json_of_concrete
-        ({ name; ty_vars; args; out_ty; body } : Operator.concrete_operator) =
+        ({ name; ty_vars; args; out_ty; body } : Operator.concrete_operator)
+        : json =
       `Assoc
         [
-          ("name", `String name);
+          ("name", S.yojson_of_path name);
           ("type_variables", `List (yojson_of_tvar <$> ty_vars));
           ("args", `List (Vars.yojson_of_var <$> args));
           ("out_type", yojson_of_ty out_ty);
@@ -259,7 +261,7 @@ module MOperator : MSymbol = struct
             [
               ("abstract_def", S.OpData.yojson_of_abstract_def adef);
               ( "associated_fun",
-                `List ((fun s -> `String (S.to_string s)) <$> afun) );
+                `List (S.yojson_of_path <$> afun) );
             ]
       | S.OpData.Concrete (Operator.Val c) -> json_of_concrete c
       | _ -> assert false
@@ -317,14 +319,34 @@ module MMacro : MSymbol = struct
         "ts", ts;
         "ty", ty;
         "bodies", bodies
-      ]
-    in
+      ] in
+    let yojson_of_structed_macro_data 
+      ({name; default;tinit; body=(var, body);rec_ty;ty}: Macros.structed_macro_data)
+      : json =
+      let name = S.yojson_of_path name in
+      let default = yojson_of_term default in
+      let tinit = yojson_of_term tinit in
+      let body = `Assoc [
+          "var", Vars.yojson_of_var var;
+          "body", yojson_of_term body
+        ] in
+      let rec_ty = Type.yojson_of_ty rec_ty in (* ??? *)
+      let ty = Type.yojson_of_ty ty in
+      `Assoc [
+        "name", name;
+        "default", default;
+        "tinit", tinit;
+        "body", body;
+        "rec_ty", rec_ty;
+        "ty", ty
+      ] in
+    let yojson_of_general_macro_data = function
+    (* untagged enum *)
+    | Macros.ProtocolMacro `Output -> `String "Output"
+    | Macros.ProtocolMacro `Cond -> `String "Cond"
+    | Macros.Structured s -> yojson_of_structed_macro_data s in
     function
-    | S.Input -> `String "Input"
-    | S.Output -> `String "Output"
-    | S.Cond -> `String "Cond"
-    | S.Exec -> `String "Exec"
-    | S.Frame -> `String "Frame"
+    | S.General (Macros.Macro_data gmd) -> yojson_of_general_macro_data gmd
     | S.State (arity, ty, _) ->
         "State"
         <<@ `Assoc
@@ -372,7 +394,7 @@ let yojson_of_descr : descr -> json =
     let aux (symb, args, body) =
       `Assoc
         [
-          ("symb", `String (S.to_string symb));
+          ("symb", S.yojson_of_path symb);
           ("args", `List (yojson_of_term <$> args));
           ("body", yojson_of_term body);
         ]
@@ -393,18 +415,18 @@ let yojson_of_descr : descr -> json =
     } ->
       `Assoc
         [
-          ("name", `String (S.to_string name));
+          ("name", S.yojson_of_path name);
           ("action", Action.yojson_of_action_v action);
-          ("input", `String (S.to_string input));
+          ("input", S.yojson_of_path input);
           ("indices", yojson_of_lvars indices);
           ( "condition",
             ("vars", yojson_of_lvars cvars) <<@>> ("term", yojson_of_term cond)
           );
           ("updates", yojson_of_updates lu);
           ( "output",
-            ("channel", `String (S.to_string c))
+            ("channel", S.yojson_of_path c)
             <<@>> ("term", yojson_of_term msg) );
-          ("globals", `List ((fun x -> `String (S.to_string x)) <$> globals));
+          ("globals", `List (S.yojson_of_path <$> globals));
         ]
 
 type cv_context = {

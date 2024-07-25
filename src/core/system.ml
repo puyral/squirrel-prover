@@ -163,8 +163,8 @@ module Single = struct
     system     : Symbols.system ;
     projection : Term.proj
   }
-  let yojson_of_t {system; projection} =
-    let system = `String (Symbols.to_string system) in
+  let yojson_of_t {system; projection} : Yojson.Safe.t =
+    let system = Symbols.yojson_of_path system in
     let projection = `String (Term.proj_to_string projection) in
     `Assoc ["system", system; "projection", projection]
 

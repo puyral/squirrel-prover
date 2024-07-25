@@ -146,6 +146,12 @@ type npath = {
   npath : _namespace t list;
   id    : int;                    (** for hash-consing *)
 }
+let yojson_of_npath ({npath; id}:npath) : Yojson.Safe.t =
+  let aux path = `String (to_string path) in
+  `Assoc [
+    "npath", `List (List.map aux npath);
+    "id", `Int id
+  ]
 
 (** A path to any symbol (internal).
     [{np; s}] represents the path [np.s]. *)
@@ -154,6 +160,12 @@ type 'a path = {
   s  : 'a t;
   id : int;                    (** for hash-consing *)
 }
+let yojson_of_path ({np; s; id}:'a path) : Yojson.Safe.t =
+  `Assoc [
+    "npath", yojson_of_npath np;
+    "symb", `String (to_string s);
+    "id", `Int id
+  ]
 
 (** Hide type parameter, which is phantom either way.
     Unboxed for performances. *)

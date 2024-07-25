@@ -24,16 +24,19 @@ type 'a isymb = private {
   s_symb : 'a;
   s_typ  : Type.ty;
 }
+[@@deriving yojson_of]
 
 val mk_symb : 'a -> Type.ty -> 'a isymb
 
 (** Names represent random values of length the security parameter. *)
 type nsymb = Symbols.name isymb
+[@@deriving yojson_of]
 
 (** Macros are used to represent inputs, outputs, contents of state
     variables, and let definitions: everything that is expanded when
     translating the meta-logic to the base logic. *)
 type msymb = Symbols.macro isymb
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 (** An applied function type.

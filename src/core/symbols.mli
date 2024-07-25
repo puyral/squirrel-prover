@@ -124,6 +124,7 @@ type 'a path = private {
   s  : 'a t;
   id : int;                    (** for hash-consing *)
 }
+val yojson_of_path: 'a path -> Yojson.Safe.t
 
 (*------------------------------------------------------------------*)
 type channel   = _channel   path

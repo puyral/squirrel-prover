@@ -17,6 +17,7 @@ type 'a isymb = {
   s_symb    : 'a;
   s_typ     : Type.ty;
 }
+[@@deriving yojson_of]
 
 let mk_symb (s : 'a) (t : Type.ty) =
   let () = match t with
@@ -29,7 +30,12 @@ let mk_symb (s : 'a) (t : Type.ty) =
 let hash_isymb s = Symbols.path_id s.s_symb (* for now, type is not hashed *)
 
 type nsymb = Symbols.name  isymb
+let yojson_of_nsymb: nsymb -> Yojson.Safe.t =
+  yojson_of_isymb Symbols.yojson_of_path
+
 type msymb = Symbols.macro isymb
+let yojson_of_msymb: msymb -> Yojson.Safe.t =
+  yojson_of_isymb Symbols.yojson_of_path
 
 (*------------------------------------------------------------------*)
 (** See `.mli` *)
