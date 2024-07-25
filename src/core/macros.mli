@@ -162,7 +162,30 @@ type system_map_arg =
       is defined *)
 
 (*------------------------------------------------------------------*)
-type global_data
+type global_data = {
+  action : [`Strict | `Large] * Action.shape;
+  (** The global macro is defined at any action which has
+      the action shape as a strict or large prefix *)
+
+  inputs : Vars.var list;
+  (** Inputs of the macro, as variables, in order. *)
+
+  indices : Vars.var list;
+  (** Free indices of the macro, which corresponds to the prefix of
+      the indices of the action defining the macro. *)
+  (* FIXME: clarify documentation *)
+
+  ts : Vars.var;
+  (** Free timestamp variable of the macro, which can only be instantiated
+      by a strict suffix of [action]. *)
+
+  bodies : (System.Single.t * Term.term) list;
+  (** Definitions of macro body for single systems where it is defined. *)
+
+  ty : Type.ty;
+  (** The type of the macro, which does not depends on the system. *)
+}
+type Symbols.global_macro_def += Global_data of global_data
 
 (** Given the name [ns] of a macro as well as a function [f] over
     terms, an [old_single_system] and a [new_single_system], takes the
