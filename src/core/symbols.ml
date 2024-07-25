@@ -49,8 +49,9 @@ type assoc = [`Right | `Left | `NonAssoc]
 let yojson_of_assoc x = Json.to_assoc (yojson_of_assoc x)
 
 type symb_type = [ `Prefix | `Infix of assoc ]
-[@@deriving yojson_of]
-let yojson_of_symb_type x = Json.to_assoc (yojson_of_symb_type x)
+let yojson_of_symb_type = function
+ | `Prefix -> `String "Prefix"
+ | `Infix a -> `Assoc ["Infix", yojson_of_assoc a]
 
 (*------------------------------------------------------------------*)
 type symbol_kind =

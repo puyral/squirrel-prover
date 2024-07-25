@@ -97,6 +97,7 @@ module Single : sig
     system     : Symbols.system ;
     projection : Term.proj
   }
+  [@@deriving yojson_of]
 
   (** A single system is obtained by taking a valid projection
       of a multi-system, identified by a system symbol.

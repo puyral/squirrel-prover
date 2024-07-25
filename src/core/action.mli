@@ -62,6 +62,7 @@ val to_action   : action_v -> action
 (** Shapes represent classes of actions differing only in their indices:
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
+[@@deriving yojson_of]
 
 (*------------------------------------------------------------------*)
 val get_args   : action   -> Term.term list

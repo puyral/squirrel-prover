@@ -17,6 +17,7 @@ type 'a t = 'a item list
 
 (*------------------------------------------------------------------*)
 type shape = int t
+[@@deriving yojson_of]
 
 type action = Term.term list t
 

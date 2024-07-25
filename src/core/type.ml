@@ -90,9 +90,15 @@ type ty =
   | Tuple of ty list
   | Fun of ty * ty
 [@@deriving yojson_of]
-let yojson_of_ty = function
-  | Fun (a, b) -> `Assoc ["Fun", `Assoc ["In", yojson_of_ty a; "Out", yojson_of_ty b]]
+let yojson_of_ty = let rec aux = function
+  (* yojson is a bit dumb by default, so we need to help it *)
+  | Fun (a, b) -> `Assoc ["Fun", `Assoc ["in", aux a; "out", aux b]]
+  | TBase s -> `Assoc ["TBase",  `String s]
+  | TVar v -> `Assoc ["TVar", yojson_of_tvar v]
+  | TUnivar v -> `Assoc ["TUnivar", yojson_of_univar v]
+  | Tuple t -> `Assoc ["Tuple", `Assoc ["elements", `List (List.map aux t)]]
   | x -> Json.to_assoc (yojson_of_ty x)
+in aux
 
 (*------------------------------------------------------------------*)
 (** {2 Iterators, do not recurse} *)

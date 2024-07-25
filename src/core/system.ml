@@ -163,6 +163,10 @@ module Single = struct
     system     : Symbols.system ;
     projection : Term.proj
   }
+  let yojson_of_t {system; projection} =
+    let system = `String (Symbols.to_string system) in
+    let projection = `String (Term.proj_to_string projection) in
+    `Assoc ["system", system; "projection", projection]
 
   let make table system projection =
     if valid_projection table system projection then
