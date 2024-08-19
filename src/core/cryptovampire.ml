@@ -9,6 +9,14 @@ module S = Symbols
 type descr = Action.descr
 type json = Yojson.Safe.t
 
+
+type query_context = {
+  system: SystemExpr.fset;
+  table: S.table;
+  sequent: LowTraceSequent.t;
+  variables: Vars.var list
+}
+
 let ( <$> ) = List.map
 
  let (<@>) (a:json) (b:json): json = match a, b with
@@ -128,7 +136,7 @@ module type MSymbol = sig
 
   type mdata [@@deriving yojson_of]
 
-  val mdata_of_data : S.data -> mdata option
+  val mdata_of_data : query_context -> S.data -> mdata option
   val name : string
 end
 
@@ -141,10 +149,10 @@ module MExtra (N : MSymbol) = struct
   let yojson_of_content ({ symb; data } : content) =
     `Assoc [ ("symb", yojson_of_path symb); ("data", N.yojson_of_mdata data) ]
 
-  let get_content_list (table : S.table) : content list =
+  let get_content_list (ctx: query_context) (table : S.table) : content list =
     N.fold
       (fun symb data acc ->
-        { symb; data = Option.get (N.mdata_of_data data) } :: acc)
+        { symb; data = Option.get (N.mdata_of_data ctx data) } :: acc)
       [] table
 end
 
@@ -153,7 +161,7 @@ module MType : MSymbol = struct
 
   type mdata = S.TyInfo.t list [@@deriving yojson_of]
 
-  let mdata_of_data = function S.TyInfo.Type l -> Some l | _ -> None
+  let mdata_of_data _ = function S.TyInfo.Type l -> Some l | _ -> None
   let name = "Type"
 end
 module MTypeExtra = MExtra (MType)
@@ -163,7 +171,7 @@ module MOperator : MSymbol = struct
 
   type mdata = S.OpData.op_data
 
-  let mdata_of_data = function S.OpData.Operator data -> Some data | _ -> None
+  let mdata_of_data _ = function S.OpData.Operator data -> Some data | _ -> None
   let name = "Operator"
 
   let yojson_of_mdata ({ ftype; def } : mdata) =
@@ -200,7 +208,7 @@ module MName : MSymbol = struct
 
   type mdata = S.name_data
 
-  let mdata_of_data = function S.Name data -> Some data | _ -> None
+  let mdata_of_data _ = function S.Name data -> Some data | _ -> None
   let name = "Name"
   let yojson_of_mdata ({ n_fty } : mdata) = Type.yojson_of_ftype n_fty
 end
@@ -210,13 +218,13 @@ module MNameExtra = MExtra (MName)
 module MMacro : MSymbol = struct
   include S.Macro
 
-  type mdata = S.macro_data
+  type mdata = {ctx: query_context; data: S.macro_data}
 
-  let mdata_of_data = function S.Macro d -> Some d | _ -> None
+  let mdata_of_data ctx = function S.Macro data -> Some {ctx; data} | _ -> None
 
   (* TODO *)
-  let yojson_of_mdata =
-    let yojson_of_global_data ({action; inputs; indices; ts; bodies;ty}: Macros.global_data) = 
+  let yojson_of_mdata {ctx; data}=
+    let yojson_of_global_data ({action; inputs; indices; ts; bodies=_;ty} as global_data:  Macros.global_data) = 
       let action = 
         let kind, shape = action in
         let kind = `String (match kind with
@@ -228,19 +236,14 @@ module MMacro : MSymbol = struct
       let indices = `List (Vars.yojson_of_var <$> indices) in
       let ts = Vars.yojson_of_var ts in
       let ty = Type.yojson_of_ty ty in
-      let bodies =
-          let aux (single_system, body) =
-            let body = yojson_of_term body in
-            let single_system = System.Single.yojson_of_t single_system in
-            `Assoc ["single_system", single_system; "body", body] in
-          `List (aux <$> bodies) in
+      let body = Macros.get_body ctx.table ctx.system global_data in
       `Assoc [
         "action", action;
         "inputs", inputs;
         "indices", indices;
         "ts", ts;
         "ty", ty;
-        "bodies", bodies
+        "body", yojson_of_term body
       ] in
     let yojson_of_structed_macro_data 
       ({name; default;tinit; body=(var, body);rec_ty;ty}: Macros.structed_macro_data)
@@ -267,7 +270,7 @@ module MMacro : MSymbol = struct
     | Macros.ProtocolMacro `Output -> `String "Output"
     | Macros.ProtocolMacro `Cond -> `String "Cond"
     | Macros.Structured s -> yojson_of_structed_macro_data s in
-    function
+    match data with
     | S.General (Macros.Macro_data gmd) -> "General" <<@ yojson_of_general_macro_data gmd
     | S.State (arity, ty, _) ->
         "State"
@@ -296,7 +299,7 @@ module MAction : MSymbol = struct
 
   type mdata = Vars.var list * Action.action_v
 
-  let mdata_of_data = function
+  let mdata_of_data _ = function
     | Action.ActionData (Action.Def (vars, a)) ->
         Some (vars, Action.to_action_v a)
     | _ -> None
@@ -369,12 +372,11 @@ type cv_context = {
 
 let yojson_of_cv_context x = Json.to_assoc (yojson_of_cv_context x)
 
-let make_cv_context (s : TraceSequent.t) : cv_context =
-  (* shortcuts *)
+let make_query_context (sequent:LowTraceSequent.t) : query_context =
   let module LTS = LowTraceSequent in
   let module TS = TraceSequent in
-  (* gather containers *)
-  let env = TS.env s in
+
+  let env = TS.env sequent in
   let system =
     match SystemExpr.to_fset env.system.set with
     | exception SystemExpr.(Error (_, Expected_fset)) ->
@@ -382,6 +384,14 @@ let make_cv_context (s : TraceSequent.t) : cv_context =
     | fsys -> fsys
   in
   let table = env.table in
+  let variables = Vars.to_vars_list env.vars in
+  {sequent; table; system; variables}
+
+let make_cv_context (ctx: query_context) : cv_context =
+  let {sequent=s; system; table; variables} = ctx in
+  (* shortcuts *)
+  let module LTS = LowTraceSequent in
+  (* gather containers *)
 
   (* then we build the cv_context *)
   let query = LTS.conclusion s in
@@ -393,12 +403,11 @@ let make_cv_context (s : TraceSequent.t) : cv_context =
         | _ -> None (*TODO*))
       (LTS.Hyps.to_list s)
   in
-  let variables = Vars.to_vars_list env.vars in
   let actions = get_actions_descr_list table system in
-  let names = MNameExtra.get_content_list table in
-  let operators = MOperatorExtra.get_content_list table in
-  let macros = MMacroExtra.get_content_list table in
-  let types = MTypeExtra.get_content_list table in
+  let names = MNameExtra.get_content_list ctx table in
+  let operators = MOperatorExtra.get_content_list ctx table in
+  let macros = MMacroExtra.get_content_list ctx table in
+  let types = MTypeExtra.get_content_list ctx table in
   { query; hypotheses; variables; actions; names; operators; macros; types }
 
 type cv_parameters = {
@@ -417,7 +426,7 @@ type to_cv = { parameters : cv_parameters; context : cv_context }
 let yojson_of_to_cv x = Json.to_assoc (yojson_of_to_cv x)
 
 let run_cryptovampire (parameters : cv_parameters) (s : LowTraceSequent.t) =
-  let context = make_cv_context s in
+  let context = make_cv_context (make_query_context s) in
   let json = yojson_of_to_cv { context; parameters } in
 
   (* print to file *)

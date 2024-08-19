@@ -205,7 +205,10 @@ val update_global_data :
   Symbols.table
 
 val as_global_macro : Symbols.data -> global_data
-    
+
+(** Get body of a global macro for a system expression. *)
+val get_body:  Symbols.table -> SE.fset -> global_data -> Term.term
+
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
