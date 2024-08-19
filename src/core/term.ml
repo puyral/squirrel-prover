@@ -173,6 +173,7 @@ type 'a diff_args =
 (*------------------------------------------------------------------*)
 type quant = ForAll | Exists | Seq | Lambda
 [@@deriving yojson_of]
+let yojson_of_quant x = Utils.Json.to_assoc (yojson_of_quant x)
 
 let pp_quant fmt = function
   | ForAll -> Fmt.pf fmt "forall"

@@ -93,9 +93,12 @@ type ty =
 let yojson_of_ty = let rec aux = function
   (* yojson is a bit dumb by default, so we need to help it *)
   | Fun (a, b) -> `Assoc ["Fun", `Assoc ["in", aux a; "out", aux b]]
-  | TBase (path, name) -> `Assoc ["TBase",  
-              `Assoc ["path", yojson_of_list yojson_of_string path; 
-                      "name", `String name]]
+  | TBase (path, name) ->
+      `Assoc ["TBase",
+          `Assoc ["npath",
+              (* I am emulating the [Symbols.path] *)
+              `Assoc ["npath", yojson_of_list yojson_of_string path];
+                  "symb", `String name]]
   | TVar v -> `Assoc ["TVar", yojson_of_tvar v]
   | TUnivar v -> `Assoc ["TUnivar", yojson_of_univar v]
   | Tuple t -> `Assoc ["Tuple", `Assoc ["elements", `List (List.map aux t)]]

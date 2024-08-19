@@ -114,85 +114,14 @@ let rec yojson_of_term : Term.term -> json = function
       `Assoc
         [
           ("constructor", `String "Quant");
-          ("quantficator", Term.yojson_of_quant q);
+          ("quantificator", Term.yojson_of_quant q);
           ("vars", `List (List.map (fun v -> yojson_of_term (mk_var v)) vl));
           ("body", yojson_of_term t1);
         ]
 
-(* let abs_symb f table =
-   if Symbols.OpData.is_abstract f table then
-     let def,assoc_fun = Symbols.OpData.get_abstract_data f table in
-     let ls = List.map
-       (fun f -> let f_def,_ = Symbols.OpData.get_abstract_data f table in
-         `Assoc ["Name", `String (Symbols.to_string f);
-         "Def", `String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def f_def)])
-     assoc_fun in
-     Some (`Assoc ["Def",`String (Format.asprintf "%a" Symbols.OpData.pp_abstract_def def); "AssocFun", `List ls])
-   else
-     None *)
-
 let get_actions_descr_list (table : S.table) (system : SE.fset) :
     Action.descr list =
   SystemExpr.map_descrs (fun x -> x) table system
-
-(* let cryptovampire_export (s:TraceSequent.t) : unit =
-   let env = TraceSequent.env s in
-   let system = match SystemExpr.to_fset env.system.set with
-     | exception SystemExpr.(Error (_,Expected_fset)) -> Tactics.(hard_failure (Failure "I was told to error out in this case"))
-     | fsys -> fsys
-   in
-   let evars = Vars.to_vars_list env.vars
-   and table = env.table in
-   let actions  = SystemExpr.map_descrs (fun x -> x)  table system in
-   (* let all_actions = SE.actions table system in *)
-   let fun_table =
-     Symbols.Operator.fold
-     (fun fname _ acc ->
-       ((Symbols.OpData.get_data fname table).ftype, Symbols.to_string fname, abs_symb fname table)::acc)
-     []
-     table
-   and name_table =
-     Symbols.Name.fold
-       (fun name _ acc ->
-         ((Symbols.get_name_data name table).n_fty, Symbols.to_string name,None)::acc
-       )
-       []
-       table
-   and macro_table =
-     Symbols.Macro.fold
-     (fun mn _ acc ->
-       let def = Symbols.get_macro_data mn table
-       and str = Symbols.to_string mn in
-       let indices,ty = match def with
-         | Input | Output | Frame -> 0,Message
-         | Exec | Cond -> 0, Boolean
-         | State (i,t,_) | Global (i,t,_) -> i,t
-       in (str,indices,ty)::acc
-     )
-     []
-     table
-   in
-   let conclusion = LowTraceSequent.conclusion s in
-   let hypotheses =
-     List.filter_map
-       (function
-         |_,Hyps.LHyp (Equiv.Local h) -> Some h
-         | _, Hyps.LHyp (Equiv.(Global Atom (Reach f))) -> Some f
-         | _ -> None(*TODO*))
-     (LowTraceSequent.Hyps.to_list s)
-   in
-   let j_export = `Assoc ["Conclusion", yojson_of_term conclusion;
-   "Hypotheses", `List (List.map yojson_of_term hypotheses);
-   "Variables", `List (List.map Vars.yojson_of_var evars);
-   (* "Functions", `List (List.map operator_to_json fun_table); *)
-   (* "Names", `List (List.map operator_to_json name_table); *)
-   (* "Macros", `List (List.map macro_to_json macro_table)] in  *)
-   (* Format.printf "%s@." (Basic.pretty_to_string j_export) ; *)
-   ] in
-
-   let oc = open_out_gen [Open_append;Open_creat] 0o644 "/tmp/sq.json" in
-   let ppf = Format.formatter_of_out_channel oc in
-   Format.fprintf ppf "%s@." (Safe.to_string j_export) *)
 
 module type MSymbol = sig
   include S.SymbolKind
@@ -218,11 +147,6 @@ module MExtra (N : MSymbol) = struct
         { symb; data = Option.get (N.mdata_of_data data) } :: acc)
       [] table
 end
-
-(* let json_of_ftype ({fty_vars; fty_args; fty_out}:Type.ftype)  =
-   ("Vars", `List (json_of_tvar <$> fty_vars))
-     <<@>> ("Args", `List (json_of_ty <$> fty_args))
-     <@>> ("Out", json_of_ty fty_out) *)
 
 module MType : MSymbol = struct
   include S.BType
@@ -292,8 +216,6 @@ module MMacro : MSymbol = struct
 
   (* TODO *)
   let yojson_of_mdata =
-    (* let yojson_of_state_macro_def = function
-       | Theory.State *)
     let yojson_of_global_data ({action; inputs; indices; ts; bodies;ty}: Macros.global_data) = 
       let action = 
         let kind, shape = action in
@@ -346,7 +268,7 @@ module MMacro : MSymbol = struct
     | Macros.ProtocolMacro `Cond -> `String "Cond"
     | Macros.Structured s -> yojson_of_structed_macro_data s in
     function
-    | S.General (Macros.Macro_data gmd) -> yojson_of_general_macro_data gmd
+    | S.General (Macros.Macro_data gmd) -> "General" <<@ yojson_of_general_macro_data gmd
     | S.State (arity, ty, _) ->
         "State"
         <<@ `Assoc
@@ -356,7 +278,7 @@ module MMacro : MSymbol = struct
                 (* state_macro_def is unreachable *)
               ]
     | S.Global (arity, ty, Macros.Global_data global) -> 
-      "State" <<@ `Assoc 
+      "Global" <<@ `Assoc 
               [
                 ("arity", yojson_of_int arity);
                 ("type", yojson_of_ty ty);
