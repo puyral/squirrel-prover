@@ -39,6 +39,8 @@ val pp_kind : [`Axiom | `Lemma] formatter
 (*------------------------------------------------------------------*)
 (** {2 Depends, Mutex } *)
 
+val mk_depends_mutex : Symbols.table -> Symbols.system -> Goal.statement list
+
 (** Add to the symbol table the sequential dependencies and mutual
     exclusion lemmas for a given system. *)
 val add_depends_mutex_lemmas : Symbols.table -> Symbols.system -> Symbols.table
