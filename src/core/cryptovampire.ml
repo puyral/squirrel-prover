@@ -222,7 +222,6 @@ module MMacro : MSymbol = struct
 
   let mdata_of_data ctx = function S.Macro data -> Some {ctx; data} | _ -> None
 
-  (* TODO *)
   let yojson_of_mdata {ctx; data}=
     let yojson_of_global_data ({action; inputs; indices; ts; bodies=_;ty} as global_data:  Macros.global_data) = 
       let action = 
@@ -266,19 +265,25 @@ module MMacro : MSymbol = struct
         "ty", ty
       ] in
     let yojson_of_general_macro_data = function
-    (* untagged enum *)
-    | Macros.ProtocolMacro `Output -> `String "Output"
-    | Macros.ProtocolMacro `Cond -> `String "Cond"
-    | Macros.Structured s -> yojson_of_structed_macro_data s in
+      (* untagged enum *)
+      | Macros.ProtocolMacro `Output -> `String "Output"
+      | Macros.ProtocolMacro `Cond -> `String "Cond"
+      | Macros.Structured s -> yojson_of_structed_macro_data s in
+    let yojson_of_state_macro_def = function
+      | Macros.StateInit_data (vars, term) ->
+          `Assoc [
+            "vars", yojson_of_list Vars.yojson_of_var vars; 
+            "init", yojson_of_term term]
+      | _ -> assert false in
     match data with
     | S.General (Macros.Macro_data gmd) -> "General" <<@ yojson_of_general_macro_data gmd
-    | S.State (arity, ty, _) ->
+    | S.State (arity, ty, smd) ->
         "State"
         <<@ `Assoc
               [
                 ("arity", yojson_of_int arity);
                 ("type", yojson_of_ty ty);
-                (* state_macro_def is unreachable *)
+                ("init", yojson_of_state_macro_def smd)
               ]
     | S.Global (arity, ty, Macros.Global_data global) -> 
       "Global" <<@ `Assoc 
