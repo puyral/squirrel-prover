@@ -1,17 +1,12 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
+(* ----- set up ------- *)
+
 type lts_t = LowTraceSequent.t
+type cv_parameters = { num_retry : int; timeout : int } [@@deriving yojson_of]
 
-type cv_parameters = {
-  num_retry : int;  (** number of retries*)
-  timeout : int;  (** timeout for each solvers*)
-}
-[@@deriving yojson_of]
-(** paramerters to be passed on to cv *)
 let yojson_of_cv_parameters x = Utils.Json.to_assoc (yojson_of_cv_parameters x)
-
 let default_parameters = { num_retry = 5; timeout = 1 }
-
 let yojson_of_lts_t s = JsonExport.json_of_low_trace_sequent s
 
 type to_cv = { parameters : cv_parameters; context : lts_t }
@@ -19,8 +14,17 @@ type to_cv = { parameters : cv_parameters; context : lts_t }
 
 let yojson_of_to_cv x = Utils.Json.to_assoc (yojson_of_to_cv x)
 
+(* ----- logic of the tactic ------- *)
+
+(** try to run cryptovampire *)
 let run_cryptovampire (parameters : cv_parameters) (s : LowTraceSequent.t) =
-  let json = yojson_of_to_cv { context=s; parameters } in
+  let json = yojson_of_to_cv { context = s; parameters } in
+
+  (* TODOS:
+    - [-] the cryptovampire side (mostly there)
+    - [ ] actually call cv from squirrel and deal with its output
+    - [ ] parametrize things (be it cv itself, or the interface between cv and squirrel )
+  *)
 
   (* print to file *)
   let file = "/tmp/sq.json" in

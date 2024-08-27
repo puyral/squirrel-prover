@@ -747,6 +747,8 @@ module Lazy = struct
   let map f x = lazy (f (Lazy.force x))
 end
 
+(* This module is here instead of in JsonExport to avoid
+   cyclical dependencies                                 *)
 module Json = struct 
   let to_assoc = function
   | `List (`String key::[]) -> `String key
