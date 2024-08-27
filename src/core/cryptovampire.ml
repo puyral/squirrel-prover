@@ -2,6 +2,7 @@ open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 (* ----- set up ------- *)
 
+(** to make yojson happy *)
 type lts_t = LowTraceSequent.t
 type cv_parameters = { num_retry : int; timeout : int } [@@deriving yojson_of]
 

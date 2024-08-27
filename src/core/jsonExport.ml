@@ -38,16 +38,10 @@ let make_query_context (sequent : LowTraceSequent.t) : query_context =
 (** haskel-style `fmap` *)
 let ( <$> ) = List.map
 
-(** quick merge between jsons *)
-let ( <@> ) (a : json) (b : json) : json =
-  match (a, b) with
-  | `Assoc l, `Assoc l' -> `Assoc (l @ l')
-  | _ -> `List [ a; b ]
-
 (** syntactic sugar to be able to write something like `("a", t) <<@>> ("b", t')` *)
 let ( <<@>> ) (e : string * json) (e' : string * json) = `Assoc [ e; e' ]
 
-(** base case for a chain of `<<@>>` *)
+(** base case for a chain of `<<@>>`. This is useful for enum discriminants *)
 let ( <<@ ) (e : string) (d : json) = `Assoc [ (e, d) ]
 
 (** {2 Terms}
@@ -58,63 +52,55 @@ let ( <<@ ) (e : string) (d : json) = `Assoc [ (e, d) ]
 
 let rec yojson_of_term : Term.term -> json = function
   | App (f, tl) ->
-      `Assoc
+      "App" <<@ `Assoc
         [
-          ("constructor", `String "App");
           ("f", yojson_of_term f);
           ("args", `List (List.map yojson_of_term tl));
         ]
   | Fun (f, _) ->
-      `Assoc [ ("constructor", `String "Fun"); ("symb", S.yojson_of_path f) ]
+      "Fun" <<@ `Assoc [ ("symb", S.yojson_of_path f) ]
   | Name (n, tl) ->
-      `Assoc
+      "Name" <<@ `Assoc
         [
-          ("constructor", `String "Name");
           ("symb", yojson_of_nsymb n);
           ("args", `List (List.map yojson_of_term tl));
         ]
   | Macro (m, tl, ts) ->
-      `Assoc
+      "Macro" <<@ `Assoc
         [
-          ("constructor", `String "Macro");
           ("symb", yojson_of_msymb m);
           ("args", `List (List.map yojson_of_term tl));
           ("timestamp", yojson_of_term ts);
         ]
   | Action (a, tl) ->
-      `Assoc
+      "Action" <<@ `Assoc
         [
-          ("constructor", `String "Action");
           ("symb", S.yojson_of_path a);
           ("args", `List (List.map yojson_of_term tl));
         ]
-  | Var v -> `Assoc [ ("constructor", `String "Var") ] <@> Vars.yojson_of_var v
+  | Var v -> "Var" <<@ Vars.yojson_of_var v
   | Let (v, t1, t2) ->
-      `Assoc
+      "Let" <<@ `Assoc
         [
-          ("constructor", `String "Let");
           ("var", yojson_of_term (mk_var v));
           ("decl", yojson_of_term t1);
           ("body", yojson_of_term t2);
         ]
   | Tuple tl ->
-      `Assoc
+      "Tuple" <<@ `Assoc
         [
-          ("constructor", `String "Tuple");
           ("elements", `List (List.map yojson_of_term tl));
         ]
   | Proj (i, t1) ->
-      `Assoc
+      "Proj" <<@ `Assoc
         [
-          ("constructor", `String "Proj");
           ("id", `Int i);
           ("body", yojson_of_term t1);
         ]
   | Diff (Explicit td) ->
       ignore td;
-      `Assoc
+      "Diff" <<@ `Assoc
         [
-          ("constructor", `String "Diff");
           ( "terms",
             `List
               (List.map
@@ -127,7 +113,7 @@ let rec yojson_of_term : Term.term -> json = function
                  td) );
         ]
   | Find (vl, t1, t2, t3) ->
-      `Assoc
+      "Find" <<@ `Assoc
         [
           ("constructor", `String "Find");
           ("vars", `List (List.map (fun v -> yojson_of_term (mk_var v)) vl));
@@ -137,9 +123,8 @@ let rec yojson_of_term : Term.term -> json = function
         ]
   | Quant (q, vl, t1) ->
       ignore q;
-      `Assoc
+      "Quant" <<@`Assoc
         [
-          ("constructor", `String "Quant");
           ("quantificator", Term.yojson_of_quant q);
           ("vars", `List (List.map (fun v -> yojson_of_term (mk_var v)) vl));
           ("body", yojson_of_term t1);
@@ -171,14 +156,14 @@ module type MSymbol = sig
   type mdata [@@deriving yojson_of]
 
   (** how to get the data associated to the type.
-  
+
       Since we are querying into squirrel main table, we get a gigantic enum
       where we are fairly sure of the variant we got, this function aims to
       extract the data hidden in that varian. Possibly, that data may be expanded
-      using the context is relevant. 
+      using the context is relevant.
     *)
   val mdata_of_data : query_context -> S.data -> mdata option
-  
+
   (** because we need names for everything ! *)
   val name : string
 end
