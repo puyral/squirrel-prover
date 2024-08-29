@@ -67,7 +67,7 @@ let result_of_yojson f_ok f_err = function
   | `Assoc [ ("Ok", t) ] ->
       let+ o = f_ok t in
       Ok (Ok o)
-  | `Assoc [ ("Error", e) ] ->
+  | `Assoc [ ("Err", e) ] ->
       let+ e = f_err e in
       Ok (Error e)
   | _ -> Error "wrong JSON format"
