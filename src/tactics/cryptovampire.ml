@@ -1,3 +1,4 @@
+open Squirrelcore
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 let ( let+ ) = Result.bind
@@ -171,7 +172,7 @@ let run_cryptovampire (parameters : cv_parameters) (s : LowTraceSequent.t) =
       "squirrel-json";
       "--output-format";
       "json";
-      "-pn";
+      (* "-pn"; *)
       "auto";
       "--num-of-retry";
       string_of_int num_retry;
@@ -234,7 +235,9 @@ let parse_args =
 
 (* register the tactic *)
 let () =
-  ProverTactics.register_general "cryptovampire" ~pq_sound:false
+  let pq_sound = Option.is_some (Sys.getenv_opt "SQUIRREL_CRYPTOVAMPIRE_FORCE_QUANTUM") in
+
+  ProverTactics.register_general "cryptovampire" ~pq_sound:pq_sound
     (* ^^^^^^^^^^^^ don't know if cv is post-quantum safe, so I'll assume it's not *)
     (fun args s sk fk ->
       let args =
