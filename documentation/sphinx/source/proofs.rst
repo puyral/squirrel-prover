@@ -1085,6 +1085,16 @@ Local tactics
    and must not appear in any global hypothesis (some global
    hypotheses may be localised (see :tacn:`localize`) if necessary.
 
+.. tact:: cryptovampire {? ~t} {? ~nt}
+   :name: cryptovampire
+
+    Try to dispatch a goal using `cryptovampire: <https://github.com/SecPriv/CryptoVampire>`_.
+
+    To properly function, the `cryptovampire` executable must be available in
+    the path or its path must be set to `CRYPTOVAMPIRE_EXECUTABLE`.
+
+    The `t` option set the timeout and the `nt` options set the number of retries.
+
 .. tact:: eqnames
    :name: eqnames
     
