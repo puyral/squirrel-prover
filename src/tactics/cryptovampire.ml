@@ -235,9 +235,11 @@ let parse_args =
 
 (* register the tactic *)
 let () =
-  let pq_sound = Option.is_some (Sys.getenv_opt "SQUIRREL_CRYPTOVAMPIRE_FORCE_QUANTUM") in
+  let pq_sound =
+    Option.is_some (Sys.getenv_opt "SQUIRREL_CRYPTOVAMPIRE_FORCE_QUANTUM")
+  in
 
-  ProverTactics.register_general "cryptovampire" ~pq_sound:pq_sound
+  ProverTactics.register_general "cryptovampire" ~pq_sound
     (* ^^^^^^^^^^^^ don't know if cv is post-quantum safe, so I'll assume it's not *)
     (fun args s sk fk ->
       let args =
@@ -266,42 +268,37 @@ let () =
     | None -> []
     | Some s -> String.split_on_char ':' s
   in
-  let run s = match run_cryptovampire default_parameters s with 
-  | Ok _ -> (Format.eprintf "crypotvampire success"; true)
-  | Error e -> (Format.eprintf "crypotvampire %s" e; false)
-in
+  let run s =
+    match run_cryptovampire default_parameters s with
+    | Ok _ ->
+        Format.eprintf "crypotvampire success";
+        true
+    | Error e ->
+        Format.eprintf "crypotvampire %s" e;
+        false
+  in
   let bench_name = "crypotvampire" in
   if List.mem "constr" benchmarks then
-         TraceSequent.register_query_alternative
-           bench_name
-           (fun ~precise:_ s q ->
-              let s =
-                match q with
-                | None -> s
-                | Some q ->
-                  let conclusion =
-                    Term.mk_ands (List.map Term.Lit.lit_to_form q) in
-                  TraceSequent.set_conclusion conclusion s
-              in
-              run s
-              );
+    TraceSequent.register_query_alternative bench_name (fun ~precise:_ s q ->
+        let s =
+          match q with
+          | None -> s
+          | Some q ->
+              let conclusion = Term.mk_ands (List.map Term.Lit.lit_to_form q) in
+              TraceSequent.set_conclusion conclusion s
+        in
+        run s);
   if List.mem "autosimpl" benchmarks then
-         TraceTactics.AutoSimplBenchmark.register_alternative
-           bench_name
-           (fun s ->
-              run s,
-              None);
-          TraceTactics.AutoSimplBenchmark.register_alternative
-            ("AutoSimpl")
-            (fun s -> 
-              match TraceTactics.simpl_direct ~red_param:Reduction.rp_default ~strong:true ~close:true s with
-                | Ok [] -> true,None
-                | Error _ -> false,None
-                | Ok _ -> assert false)
-                ;
+    TraceTactics.AutoSimplBenchmark.register_alternative bench_name (fun s ->
+        (run s, None));
+  TraceTactics.AutoSimplBenchmark.register_alternative "AutoSimpl" (fun s ->
+      match
+        TraceTactics.simpl_direct ~red_param:Reduction.rp_default ~strong:true
+          ~close:true s
+      with
+      | Ok [] -> (true, None)
+      | Error _ -> (false, None)
+      | Ok _ -> assert false);
   if List.mem "auto" benchmarks then
-         TraceTactics.AutoBenchmark.register_alternative
-           bench_name
-           (fun (_,s) ->
-              run
-                s)
+    TraceTactics.AutoBenchmark.register_alternative bench_name (fun (_, s) ->
+        run s)
