@@ -274,7 +274,7 @@ let () =
         Format.eprintf "crypotvampire success";
         true
     | Error e ->
-        Format.eprintf "crypotvampire %s" e;
+        Format.eprintf "crypotvampire failed %s" e;
         false
   in
   let bench_name = "crypotvampire" in
