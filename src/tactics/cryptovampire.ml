@@ -258,3 +258,50 @@ let () =
       match run_cryptovampire parameters s with
       | Ok () -> sk [] fk
       | Error e -> fk (None, Tactics.Failure e))
+
+(* benchmarks, stolen for the `smt` tactic *)
+let () =
+  let benchmarks =
+    match Sys.getenv_opt "CRYPTOVAMPIRE_BENCHMARKS" with
+    | None -> []
+    | Some s -> String.split_on_char ':' s
+  in
+  let run s = match run_cryptovampire default_parameters s with 
+  | Ok _ -> (Format.eprintf "crypotvampire success"; true)
+  | Error e -> (Format.eprintf "crypotvampire %s" e; false)
+in
+  let bench_name = "crypotvampire" in
+  if List.mem "constr" benchmarks then
+         TraceSequent.register_query_alternative
+           bench_name
+           (fun ~precise:_ s q ->
+              let s =
+                match q with
+                | None -> s
+                | Some q ->
+                  let conclusion =
+                    Term.mk_ands (List.map Term.Lit.lit_to_form q) in
+                  TraceSequent.set_conclusion conclusion s
+              in
+              run s
+              );
+  if List.mem "autosimpl" benchmarks then
+         TraceTactics.AutoSimplBenchmark.register_alternative
+           bench_name
+           (fun s ->
+              run s,
+              None);
+          TraceTactics.AutoSimplBenchmark.register_alternative
+            ("AutoSimpl")
+            (fun s -> 
+              match TraceTactics.simpl_direct ~red_param:Reduction.rp_default ~strong:true ~close:true s with
+                | Ok [] -> true,None
+                | Error _ -> false,None
+                | Ok _ -> assert false)
+                ;
+  if List.mem "auto" benchmarks then
+         TraceTactics.AutoBenchmark.register_alternative
+           bench_name
+           (fun (_,s) ->
+              run
+                s)
